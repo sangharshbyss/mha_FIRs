@@ -11,14 +11,10 @@ import time
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
 import os
-from PIL import Image
-from io import BytesIO
-
-from pytesseract import pytesseract
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, \
-    ElementNotInteractableException, WebDriverException
-
+from bs4 import BeautifulSoup as BS
 from FIR_logging import logger
+import pandas as pd
+import html2csv
 
 # constants
 URL = r'https://www.mhpolice.maharashtra.gov.in/Citizen/MH/PublishedFIRs.aspx'
@@ -90,16 +86,14 @@ def get_records():
 
     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '#ContentPlaceHolder1_lbltotalrecord')))
 
-    all_column = driver.find_elements_by_tag_name('td')
+    number_of_pages = driver.find_elements_by_class_name("gridPager")
+    for each_page in number_of_pages:
+        soup = BS(driver.page_source, 'html.parser')
+        main_table = soup.find("table", {"id": "ContentPlaceHolder1_gdvDeadBody"})
+        df = pd.read_html(str(main_table))
+        df.drop(columns="Download")
+    return print(df)
 
-    atrocity_act = "महाराष्ट्र दारूबंदी अधिनियम,१९४९ - 65(e)"
-    FIR_no = "*./"
-    for act in all_column:
-        if atrocity_act in act.text:
-            act_column.append(act.text)
-        '''if FIR_no in act.text:
-            FIR_column.append(FIR_no)'''
-    print(act_column)
 
 '''
 def list_poa_caes():
@@ -108,6 +102,7 @@ def list_poa_caes():
         list_of_poa.append(FIR_number)
     return print(list_of_poa)
 '''
+
 enter_start_date("01042020", "21062020")
 
 
@@ -116,6 +111,7 @@ time.sleep(5)
 enter_police_station(4)
 driver.find_element_by_css_selector('#ContentPlaceHolder1_btnSearch').click()
 get_records()
+driver.close()
 
 
 
