@@ -14,7 +14,8 @@ import os
 from bs4 import BeautifulSoup as BS
 from FIR_logging import logger
 import pandas as pd
-import html2csv
+
+
 
 # constants
 URL = r'https://www.mhpolice.maharashtra.gov.in/Citizen/MH/PublishedFIRs.aspx'
@@ -39,15 +40,14 @@ logger.info('page open')
 wait.until(EC.presence_of_element_located((By.CSS_SELECTOR,
                                            '#ContentPlaceHolder1_txtDateOfRegistrationFrom')))
 driver.refresh()
-unit_list = Select(driver.find_element_by_css_selector('#ContentPlaceHolder1_ddlDistrict'))
-unit_names = [o.get_attribute(
-    "text") for o in unit_list.options if o.get_attribute("value") != 'Select']
+
 view_record = Select(driver.find_element_by_css_selector('#ContentPlaceHolder1_ucRecordView_ddlPageSize'))
 view_record_max = view_record.select_by_value('50')
 search = driver.find_element_by_css_selector('#ContentPlaceHolder1_btnSearch')
 # empty list
-act_column = []
-FIR_column = []
+
+dataframes= []
+COLUMNS = ['Sr.No.', 'State', 'District', 'Police Station', 'Year', 'FIR No.', 'Registration Date', 'FIR No', 'Sections']
 
 # enter dates
 
@@ -65,11 +65,6 @@ def enter_start_date(three_months_back, yesterday):
 
 
 
-def enter_unit(unit_number=0):
-    unit_list = Select(driver.find_element_by_css_selector('#ContentPlaceHolder1_ddlDistrict'))
-    unit_list.select_by_index(unit_number)
-    unit_name = unit_names[unit_number]
-    return unit_name
 
 
 def enter_police_station(number=0):
@@ -82,35 +77,63 @@ def enter_police_station(number=0):
     return police_stations_name
 
 
-def get_records():
+def get_records(some_station):
 
     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '#ContentPlaceHolder1_lbltotalrecord')))
+    number_of_records = driver.find_element_by_css_selector('#ContentPlaceHolder1_lbltotalrecord')
+    if str(number_of_records.text) == str('0'):
+        record_not_found.append(some_station)
+        logger.info(f'no record @ {some_station}')
+        return False
+    else:
+        record_found.append(some_station)
 
     number_of_pages = driver.find_elements_by_class_name("gridPager")
     for each_page in number_of_pages:
         soup = BS(driver.page_source, 'html.parser')
         main_table = soup.find("table", {"id": "ContentPlaceHolder1_gdvDeadBody"})
-        df = pd.read_html(str(main_table))
-        df.drop(columns="Download")
-    return print(df)
+        rows = main_table.find_all("tr")
+
+        cy_data = []
+        for row in rows:
+            cells = row.find_all('td')
+            cells = cells[0:9]
+            cy_data.append([cell.text for cell in cells])
+        dataframes.append(pd.DataFrame(cy_data, columns=COLUMNS))
+
+    logger.debug('dataframe created')
+
+    return dataframes
 
 
-'''
-def list_poa_caes():
-    list_of_poa = []
-    for act, FIR_number in zip(act_column, FIR_column):
-        list_of_poa.append(FIR_number)
-    return print(list_of_poa)
-'''
 
 enter_start_date("01042020", "21062020")
+time.sleep(8)
 
+unit_names = Select(driver.find_element_by_css_selector("#ContentPlaceHolder1_ddlDistrict")).options
 
-enter_unit(2)
-time.sleep(5)
-enter_police_station(4)
-driver.find_element_by_css_selector('#ContentPlaceHolder1_btnSearch').click()
-get_records()
+for name in unit_names:
+
+    unit_list = Select(driver.find_element_by_css_selector('#ContentPlaceHolder1_ddlDistrict'))
+    unit_list.select_by_index(unit_names.index(name))
+
+    police_stations = Select(driver.find_element_by_css_selector('#ContentPlaceHolder1_ddlPoliceStation'))
+    police_stations_names = [police.get_attribute("text") for police
+                             in police_stations.options if police.get_attribute("value") != '']
+
+    time.sleep(6)
+    for police_station in police_stations_names:
+        enter_police_station(police_stations_names.index(police_station))
+        driver.find_element_by_css_selector('#ContentPlaceHolder1_btnSearch').click()
+        if not get_records(police_station):
+            continue
+        else:
+            pass
+        logger.info(f'{police_station} data ready')
+    district_data = pd.concat(dataframes)
+
+    district_data.to_csv(os.path.join(Download_Directory, f'{name}.csv'))
+
 driver.close()
 
 

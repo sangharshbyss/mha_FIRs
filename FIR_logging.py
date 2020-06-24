@@ -29,4 +29,3 @@ logger = logging.getLogger(__name__)
 logger.info("Application started")
 
 # this line will only appear in the log file because level  = debug
-logger.debug("Log some gory details here")
