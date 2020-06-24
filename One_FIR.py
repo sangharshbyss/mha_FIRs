@@ -41,9 +41,8 @@ wait.until(EC.presence_of_element_located((By.CSS_SELECTOR,
                                            '#ContentPlaceHolder1_txtDateOfRegistrationFrom')))
 driver.refresh()
 
-view_record = Select(driver.find_element_by_css_selector('#ContentPlaceHolder1_ucRecordView_ddlPageSize'))
-view_record_max = view_record.select_by_value('50')
-search = driver.find_element_by_css_selector('#ContentPlaceHolder1_btnSearch')
+
+
 # empty list
 
 dataframes= []
@@ -79,17 +78,10 @@ def enter_police_station(number=0):
 
 def get_records(some_station):
 
-    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '#ContentPlaceHolder1_lbltotalrecord')))
-    number_of_records = driver.find_element_by_css_selector('#ContentPlaceHolder1_lbltotalrecord')
-    if str(number_of_records.text) == str('0'):
-        record_not_found.append(some_station)
-        logger.info(f'no record @ {some_station}')
-        return False
-    else:
-        record_found.append(some_station)
-
     number_of_pages = driver.find_elements_by_class_name("gridPager")
+
     for each_page in number_of_pages:
+        number_of_pages[number_of_pages.index(each_page)].click()
         soup = BS(driver.page_source, 'html.parser')
         main_table = soup.find("table", {"id": "ContentPlaceHolder1_gdvDeadBody"})
         rows = main_table.find_all("tr")
@@ -100,6 +92,8 @@ def get_records(some_station):
             cells = cells[0:9]
             cy_data.append([cell.text for cell in cells])
         dataframes.append(pd.DataFrame(cy_data, columns=COLUMNS))
+        logger.info(dataframes)
+
 
     logger.debug('dataframe created')
 
@@ -108,31 +102,47 @@ def get_records(some_station):
 
 
 enter_start_date("01042020", "21062020")
-time.sleep(8)
+time.sleep(1)
 
-unit_names = Select(driver.find_element_by_css_selector("#ContentPlaceHolder1_ddlDistrict")).options
+unit_list = Select(driver.find_element_by_css_selector("#ContentPlaceHolder1_ddlDistrict"))
+unit_names = [o.get_attribute("text") for o in unit_list.options]
+unit_values = [o.get_attribute("text") for o in unit_list.options if o.get_attribute("value") != 'Select']
+logger.info(len(unit_names))
+counter = 1
 
-for name in unit_names:
-
-    unit_list = Select(driver.find_element_by_css_selector('#ContentPlaceHolder1_ddlDistrict'))
-    unit_list.select_by_index(unit_names.index(name))
+while counter < len(unit_names):
+    unit_list_again = Select(driver.find_element_by_css_selector("#ContentPlaceHolder1_ddlDistrict"))
+    unit_list.select_by_index(counter)
 
     police_stations = Select(driver.find_element_by_css_selector('#ContentPlaceHolder1_ddlPoliceStation'))
     police_stations_names = [police.get_attribute("text") for police
-                             in police_stations.options if police.get_attribute("value") != '']
+                             in police_stations.options if police.get_attribute("value") != 'Select']
+    police_stations_values = [police.get_attribute("value") for police
+                              in police_stations.options if police.get_attribute("value") != 'Select']
+    print(police_stations_names)
+    logger.info(len(police_stations_names))
 
-    time.sleep(6)
-    for police_station in police_stations_names:
-        enter_police_station(police_stations_names.index(police_station))
+    time.sleep(3)
+    for police_station in police_stations_values:
+        police_stations_again = Select(driver.find_element_by_css_selector(
+            '#ContentPlaceHolder1_ddlPoliceStation'))
+        police_stations_again.select_by_value(police_station)
+        time.sleep(1)
         driver.find_element_by_css_selector('#ContentPlaceHolder1_btnSearch').click()
-        if not get_records(police_station):
-            continue
-        else:
-            pass
-        logger.info(f'{police_station} data ready')
+        time.sleep(10)
+        number_of_records = driver.find_element_by_css_selector(
+            '#ContentPlaceHolder1_lbltotalrecord')
+        print(f'{police_station} police station, total number of records: {number_of_records.text}')
+        get_records(police_station)
+
+    if len(dataframes) == 0:
+        counter += 1
+        logger.info('no data to concat')
+        continue
     district_data = pd.concat(dataframes)
 
-    district_data.to_csv(os.path.join(Download_Directory, f'{name}.csv'))
+    district_data.to_csv(os.path.join(Download_Directory, f'{unit_names[counter]}.csv'))
+    counter += 1
 
 driver.close()
 
