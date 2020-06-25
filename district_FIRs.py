@@ -61,8 +61,7 @@ def enter_date(driver, three_months_back, yesterday):
 
 
 def get_records(driver):
-
-
+    # first extract the data from current page.
     soup = BS(driver.page_source, 'html.parser')
     main_table = soup.find("table", {"id": "ContentPlaceHolder1_gdvDeadBody"})
     rows = main_table.find_all("tr")
@@ -74,9 +73,26 @@ def get_records(driver):
         cy_data.append([cell.text for cell in cells])
     dataframes.append(pd.DataFrame(cy_data, columns=COLUMNS))
     logger.info(dataframes)
+    # now iterate over each page and extract the data.
+    # 1. get all the clickable links form bottom of the page
+    all_pages = driver.find_elements_by_css_selector('.gridPager a')
+    # iterate over each page
+    # range is selected for continuance.
+    for each in range(len(all_pages)-1):
+        time.sleep(10)
+        all_pages_new = driver.find_elements_by_css_selector('.gridPager a')
+        all_pages_new[each].click()
+        soup = BS(driver.page_source, 'html.parser')
+        main_table = soup.find("table", {"id": "ContentPlaceHolder1_gdvDeadBody"})
+        rows = main_table.find_all("tr")
 
-
-    logger.debug('dataframe created')
+        cy_data = []
+        for row in rows[0:(len(rows) - 2)]:
+            cells = row.find_all('td')
+            cells = cells[0:9]
+            cy_data.append([cell.text for cell in cells])
+        dataframes.append(pd.DataFrame(cy_data, columns=COLUMNS))
+        logger.info(dataframes)
 
     return dataframes
 
@@ -109,11 +125,15 @@ while counter < 49:
     time.sleep(2)
 
     driver.find_element_by_css_selector('#ContentPlaceHolder1_btnSearch').click()
+    time.sleep(10)
+    number_of_records_found = driver.find_element_by_css_selector(
+        '#ContentPlaceHolder1_lbltotalrecord').text
     try:
-        WebDriverWait(driver, 160).until(EC.presence_of_element_located((
-            By.ID, 'ContentPlaceHolder1_gdvDeadBody')))
-        record_found.append(unit_names[counter])
+
+
         get_records(driver=driver)
+        record_found.append(unit_names[counter])
+        logger.info(f'{unit_names[counter]} no. of records: {number_of_records_found}')
 
     except TimeoutException:
         record_not_found.append(unit_names[counter])
