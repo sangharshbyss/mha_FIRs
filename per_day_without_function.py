@@ -180,7 +180,8 @@ while counter < 49:
 
         district_data.to_csv(os.path.join(Download_Directory, f'{this_district_name}_24_06_to_25_06.csv'))
     except (NoSuchElementException, TimeoutException):
-        logger.debug(f"some error retrying with same district")
+        logger.info(f"some error - retrying with new district.")
+        counter += 1
         continue
 
 # append summary file with short summary.
@@ -189,6 +190,6 @@ summary_file.write(f'Time Period: 24/06/2020 to 25/06/2020'
                    f'\n {record_not_found} \n\n\nRecords were found in '
                    f'\n totoal number of districts/unit where record was not found: {len(record_not_found)}'
                    f'\n {record_found} \n\n No records were found in following districts '
-                   f'\n total number of districts/unit where record was not found: {len(record_not_found)}')
+                   f'\n total number of districts/unit where record found: {len(record_found)}')
 
-state_FIRs.state_file()
+
