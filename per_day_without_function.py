@@ -1,5 +1,5 @@
 """
-iteration over pages fails. shiting to new file"""
+wokring fine"""
 
 import os
 import time
@@ -52,43 +52,6 @@ def enter_date(driver, three_months_back, yesterday):
     logger.info('date entered')
 
 
-
-
-
-
-
-def get_data(driver, frame_list):
-    page_data = []
-    time.sleep(10)
-    soup = BS(driver.page_source, 'html.parser')
-    main_table = soup.find("table", {"id": "ContentPlaceHolder1_gdvDeadBody"})
-    # identify rows with links to pages
-    skip_rows = main_table.find_all('tr', {"class": "gridPager"})
-    # skip those rows and itarate over rest.
-    rows = main_table.find_all("tr")
-    if type(skip_rows) is None:
-
-        for row in rows:
-            cells = row.find_all('td')
-            cells = cells[0:9]  # drop the last column
-
-            # store data in list
-            page_data.append([cell.text for cell in cells])
-        frame_list.append(pd.DataFrame(page_data, columns=COLUMNS).drop(0, axis=0))
-
-
-    else:
-        for row in rows[0:(len(rows))]:
-            page_data = []
-            cells = row.find_all('td')
-            cells = cells[0:9]  # drop the last column
-
-            # store data in list
-            page_data.append([cell.text for cell in cells])
-
-        frame_list.append(pd.DataFrame(page_data, columns=COLUMNS).drop(0, axis=0))
-
-
 @contextmanager
 def wait_for_page_load(driver, timeout=10):
     """Wait till the old page is stale and old references are not working."""
@@ -98,17 +61,45 @@ def wait_for_page_load(driver, timeout=10):
     WebDriverWait(driver, timeout).until(staleness_of(old_page))
 
 
+def extract_table(driver, single):
+    soup = BS(driver.page_source, 'html.parser')
+    main_table = soup.find("table", {"id": "ContentPlaceHolder1_gdvDeadBody"})
+
+    rows = main_table.find_all("tr")
+
+    for row in rows:
+        cells = row.find_all('td')
+        cells = cells[0:9]  # drop the last column
+
+        # store data in list
+        single.append([cell.text for cell in cells])
+
+
+def extract_table_multipage(driver, multipule):
+    soup = BS(driver.page_source, 'html.parser')
+    main_table = soup.find("table", {"id": "ContentPlaceHolder1_gdvDeadBody"})
+
+    rows = main_table.find_all("tr")
+
+    for row in rows[0:(len(rows)) - 2]:
+        cells = row.find_all('td')
+        cells = cells[0:9]  # drop the last column
+
+        # store data in list
+        multipule.append([cell.text for cell in cells])
+
+
 # main code
 
 # Start with a variable created as integer for looping
-counter = 38
-district_dataframe = []
+counter = 1
+
 while counter < 49:
     try:
         page_data = []
-
+        district_dataframe = []
         options = FirefoxOptions()
-        # options.add_argument("--headless")
+        options.add_argument("--headless")
         options.add_argument("--private-window")
         driver = webdriver.Firefox(options=options)
         driver.get(URL)
@@ -125,6 +116,7 @@ while counter < 49:
                        for o in unit_list.options if o.get_attribute("value") != 'Select']
         unit_list.select_by_index(counter)
         # check - old page is stale and new page is loaded.
+        logger.info(f'{len(unit_names)}')
         try:
             wait_for_page_load(driver=driver, timeout=60)
         except TimeoutException:
@@ -140,9 +132,9 @@ while counter < 49:
             logger.debug("wait with wait_for_page_load function.")
             logger.info('page was not loaded. trying again')
             continue
-        time.sleep(6)
+        this_district_name = driver.find_element_by_css_selector(
+            '#ContentPlaceHolder1_gdvDeadBody_Label2_0').text
 
-        wait_for_page_load(driver, 50)
         number_of_records_found = driver.find_element_by_css_selector(
             '#ContentPlaceHolder1_lbltotalrecord').text
         if number_of_records_found != 0:
@@ -153,46 +145,19 @@ while counter < 49:
             record_not_found.append(unit_names[counter])
             counter += 1
             continue
-        # extract the record at current page.
 
-        soup = BS(driver.page_source, 'html.parser')
-        main_table = soup.find("table", {"id": "ContentPlaceHolder1_gdvDeadBody"})
-        # identify rows with links to pages
-        skip_rows = main_table.find_all('tr', {"class": "gridPager"})
-        # skip those rows and itarate over rest.
-        rows = main_table.find_all("tr")
-        if type(skip_rows) is None:
-
-            for row in rows:
-                cells = row.find_all('td')
-                cells = cells[0:9]  # drop the last column
-
-                # store data in list
-                page_data.append([cell.text for cell in cells])
-            district_dataframe.append(pd.DataFrame(page_data, columns=COLUMNS).drop(0, axis=0))
-
-        else:
-            for row in rows[0:(len(rows))]:
-
-                cells = row.find_all('td')
-                cells = cells[0:9]  # drop the last column
-
-                # store data in list
-                page_data.append([cell.text for cell in cells])
-
-            district_dataframe.append(pd.DataFrame(page_data, columns=COLUMNS).drop(0, axis=0))
-        # go to other pages, if avalilable
+        # check if links to other pages available at the bottom.
         try:
             link_for_page = driver.find_element_by_css_selector('.gridPager a')
+            logger.info("multipule pages found. extracting from visible page first.")
+            extract_table_multipage(driver, page_data)
 
         except NoSuchElementException:
             logger.info("single page to record")
-            print(page_data)
-            print(district_dataframe)
-            district_data = pd.DataFrame(district_dataframe)
+            extract_table(driver, page_data)
+            district_data = pd.DataFrame(page_data, columns=COLUMNS)
+            district_data.to_csv(os.path.join(Download_Directory, f'{this_district_name}_24_06_to_25_06.csv'))
             counter += 1
-            district_data.to_csv(os.path.join(Download_Directory, f'{unit_names[counter]}_24_06_to_25_06.csv'))
-
 
         # iterate on each page but with new 'list' to avoid stale element exception
         links_for_page = driver.find_elements_by_css_selector('.gridPager a')
@@ -207,41 +172,13 @@ while counter < 49:
                 links_for_page_new[page].click()
                 logger.info(f'page {links_for_page_new.index(links_for_page_new[page])}')
                 wait_for_page_load(driver, 50)
-                page_data = []
-                time.sleep(10)
-                soup = BS(driver.page_source, 'html.parser')
-                main_table = soup.find("table", {"id": "ContentPlaceHolder1_gdvDeadBody"})
-                # identify rows with links to pages
-                skip_rows = main_table.find_all('tr', {"class": "gridPager"})
-                # skip those rows and itarate over rest.
-                rows = main_table.find_all("tr")
-                if type(skip_rows) is None:
-
-                    for row in rows:
-                        cells = row.find_all('td')
-                        cells = cells[0:9]  # drop the last column
-
-                        # store data in list
-                        page_data.append([cell.text for cell in cells])
-                    district_dataframe.append(pd.DataFrame(page_data, columns=COLUMNS).drop(0, axis=0))
-
-
-                else:
-                    for row in rows[0:(len(rows))]:
-                        page_data = []
-                        cells = row.find_all('td')
-                        cells = cells[0:9]  # drop the last column
-
-                        # store data in list
-                        page_data.append([cell.text for cell in cells])
-
-                    district_dataframe.append(pd.DataFrame(page_data, columns=COLUMNS).drop(0, axis=0))
-
+                extract_table_multipage(driver, page_data)
         counter += 1
         driver.close()
         logger.info(f'record found in: {record_found}, \nRecord not found in: {record_not_found}')
-        district_data = pd.concat(district_dataframe)
-        district_data.to_csv(os.path.join(Download_Directory, f'{unit_names[counter]}_24_06_to_25_06.csv'))
+        district_data = pd.DataFrame(page_data, columns=COLUMNS)
+
+        district_data.to_csv(os.path.join(Download_Directory, f'{this_district_name}_24_06_to_25_06.csv'))
     except (NoSuchElementException, TimeoutException):
         logger.debug(f"some error retrying with same district")
         continue
