@@ -24,11 +24,11 @@ from FIR_logging import logger
 
 URL = r'https://www.mhpolice.maharashtra.gov.in/Citizen/MH/PublishedFIRs.aspx'
 options = FirefoxOptions()
-#options.add_argument("--headless")
+options.add_argument("--headless")
 options.add_argument("--private-window")
 driver = webdriver.Firefox(options=options)
-
-
+driver.get(URL)
+driver.refresh()
 page_data = []
 district_dataframe = []
 Download_Directory = r'/home/sangharshmanuski/Documents/mha_FIRs/raw_footage'
@@ -213,15 +213,16 @@ class Search:
 
 # main code
 # wait till page is fully loaded after refresh
+wait_for_page_load(driver)
 
-view = Select(driver.find_element_by_css_selector(
-    '#ContentPlaceHolder1_ucRecordView_ddlPageSize'))
-view.select_by_value('50')
-# generate list of districts/units
 unit_values, unit_names = districts()
+driver.close()
 
 # loop to iterate over each unit
 for unit in unit_values:
+    options = FirefoxOptions()
+    options.add_argument("--headless")
+    options.add_argument("--private-window")
     driver = webdriver.Firefox(options=options)
     driver.get(URL)
     # refresh immediately as the page is of no use without it.
@@ -229,6 +230,7 @@ for unit in unit_values:
     page_data = []
     district_dataframe = []
     clicks = []
+    wait_for_page_load(driver)
     view = Select(driver.find_element_by_css_selector(
         '#ContentPlaceHolder1_ucRecordView_ddlPageSize'))
     view.select_by_value('50')
@@ -247,13 +249,21 @@ for unit in unit_values:
         logger.info("record available and page is loaded")
     if not number_of_records():
         logger.info(f"some issues yet. skip @ {unit_names[unit_values.index(unit)]}")
-        no_records.append(unit_names[unit_values.index(unit)])
+
         continue
     else:
+        numbers = number_of_records()
         logger.info(f"number of records @ {unit_names[unit_values.index(unit)]}:"
                     f" {number_of_records()}")
         records_found.append(f'{unit_names[unit_values.index(unit)]}:'
-                             f' {number_of_records()}')
+                             f' {numbers}')
+        # deciding number of pages on basis of number of records
+        total_pages = int(numbers)/50
+        if type(total_pages) is not float:
+
+            total_pages = int(numbers)//50 + 1
+        logger.info(f'{total_pages}')
+
 
     extract_table_current(page_data)
     try:
@@ -276,7 +286,7 @@ for unit in unit_values:
         district_data = pd.DataFrame(page_data, columns=COLUMNS)
         district_data.to_csv(os.path.join(Download_Directory, f'{unit_names[unit_values.index(unit)]}'
                                                               f'_15_06_to_25_06.csv'))
-        driver.close()
+
         continue
     try:
         next_page_slot = driver.find_element_by_css_selector(

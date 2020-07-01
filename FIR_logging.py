@@ -1,7 +1,7 @@
 import logging
 import sys
 
-log_file = '/home/sangharshmanuski/Documents/mha_FIRs/logging_files/logFile_1.log'
+log_file = '/home/sangharshmanuski/Documents/mha_FIRs/logging_files/logFile_2.log'
 
 # logging - source: https://stackoverflow.com/questions/
 # 13733552/logger-configuration-to-log-to-file-and-print-to-stdout
@@ -17,9 +17,8 @@ logging.getLogger().addHandler(console)
 
 # Add file handler, with level DEBUG
 handler = logging.FileHandler(log_file)
-handler.setLevel(logging.DEBUG)
-formater = logging.Formatter('%(asctime)s\t%(filename)s\t%(lineno)s\
-t%(name)s\t%(funcName)s\t%(levelname)s\t%(message)s', "%Y-%m-%d %H:%M:%S")
+handler.setLevel(logging.INFO)
+formater = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', "%Y-%m-%d %H:%M:%S")
 handler.setFormatter(formater)
 logging.getLogger().addHandler(handler)
 
@@ -28,4 +27,4 @@ logger = logging.getLogger(__name__)
 # this line will appear on console and in the log file
 logger.info("Application started")
 
-# this line will only appear in the log file because level  = debug
+
