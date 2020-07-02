@@ -4,7 +4,7 @@ reaching to all pages. BUT after end of all pages, it comes back to some of the 
 import os
 import time
 from contextlib import contextmanager
-import state_FIRs
+
 import pandas as pd
 from bs4 import BeautifulSoup as BS
 from selenium import webdriver
@@ -44,9 +44,9 @@ COLUMNS = ['Sr.No.', 'State', 'District', 'Police Station', 'Year', 'FIR No.', '
 def districts():
     unit_list = Select(driver.find_element_by_css_selector("#ContentPlaceHolder1_ddlDistrict"))
     values = [o.get_attribute("value")
-              for o in unit_list.options if o.get_attribute("value") != 'Select']
+              for o in unit_list.options if o.get_attribute("value") not in 'Select']
     names = [o.get_attribute("text")
-             for o in unit_list.options if o.get_attribute("value") != 'Select']
+             for o in unit_list.options if o.get_attribute("value") not in 'Select']
     return values, names
 
 
@@ -61,7 +61,7 @@ def wait_for_page_load(driver, timeout=30):
 
 def search():
     driver.find_element_by_css_selector('#ContentPlaceHolder1_btnSearch').click()
-    time.sleep(7)
+    time.sleep(10)
     wait_for_page_load(driver)
 
 
@@ -84,7 +84,7 @@ def total_pages(district):
     # deciding ideal number of pages on basis of number of records
     ideal_total_pages = int(numbers) / 50
     if type(ideal_total_pages) is float:
-        ideal_total_pages = int(numbers) // 50
+        ideal_total_pages = int(numbers) // 50 + 1
     logger.info(f'{ideal_total_pages}')
     return ideal_total_pages
 
@@ -124,7 +124,7 @@ def next_page(clicks, data, district):
     # iterate every page.
     ideal_pages = total_pages(district)
     try:
-        link_for_page = driver.find_element_by_css_selector('.gridPager a')
+        driver.find_element_by_css_selector('.gridPager a')
     except NoSuchElementException:
         return False
     links_for_pages = driver.find_elements_by_css_selector('.gridPager a')
@@ -137,7 +137,7 @@ def next_page(clicks, data, district):
                 if links_for_pages_new[page].text != '...':
                     click_it = links_for_pages_new[page].click()
                     clicks.append(click_it)
-                    time.sleep(7)
+                    time.sleep(10)
                     logger.info(f'page {page}')
                     extract_table_multipage(data)
             else:
@@ -157,14 +157,21 @@ def second_page_slot():
 
 
 def next_to_second_page_slot():
-    try:
-        link_for_page_slot = driver.find_element_by_css_selector(
-            '.gridPager > td:nth-child(1) > table:nth-child(1) > tbody:nth-child(1) '
-            '> tr:nth-child(1) > td:nth-child(12) > a:nth-child(1)')
-        link_for_page_slot.click()
-        time.sleep(5)
-    except NoSuchElementException:
-        return False
+    while True:
+        try:
+            next_page_slot = driver.find_element_by_css_selector(
+                '.gridPager > td:nth-child(1) > table:nth-child'
+                '(1) > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(12) > a:nth-child(1)')
+            next_page_slot.click()
+            number_of_clicks.append(number_of_clicks)
+            extract_table_multipage(page_data)
+            next_page(number_of_clicks, page_data, this.district_name)
+        except NoSuchElementException:
+            district_data = pd.DataFrame(page_data, columns=COLUMNS)
+            district_data.to_csv(os.path.join(Download_Directory, f'{this.district_name}'
+                                                                  f'_01_06_to_29_06_2020.csv'))
+        except TimeoutException:
+            logger.info("page not reachable")
 
 
 class Search:
@@ -196,10 +203,7 @@ class Search:
     def search_the_district(self):
         dist_list = Select(driver.find_element_by_css_selector(
             "#ContentPlaceHolder1_ddlDistrict"))
-        dist_names = [o.get_attribute("text")
-                      for o in dist_list.options if o.get_attribute("value") != 'Select']
-        dist_values = [o.get_attribute("value")
-                       for o in dist_list.options if o.get_attribute("value") != 'Select']
+
         dist_list.select_by_value(self.district_value)
         time.sleep(6)
         search()
@@ -247,7 +251,7 @@ for unit in unit_values:
     view.select_by_value('50')
 
     # create district object
-    this = Search(15062020, 25062020, unit, unit_names[unit_values.index(unit)])
+    this = Search(31052020, 29062020, unit, unit_names[unit_values.index(unit)])
     this.enter_date()
     wait_for_page_load(driver)
     this.search_the_district()
@@ -269,7 +273,7 @@ for unit in unit_values:
     except:
         district_data = pd.DataFrame(page_data, columns=COLUMNS)
         district_data.to_csv(os.path.join(Download_Directory, f'{this.district_name}'
-                                                              f'_15_06_to_25_06.csv'))
+                                                              f'_01_06_to_29_06.csv'))
         driver.close()
         continue
 
@@ -283,19 +287,15 @@ for unit in unit_values:
     except:
         district_data = pd.DataFrame(page_data, columns=COLUMNS)
         district_data.to_csv(os.path.join(Download_Directory, f'{this.district_name}'
-                                                              f'_15_06_to_25_06.csv'))
+                                                              f'_01_06_to_29_06.csv'))
         continue
-    try:
-        next_page_slot = driver.find_element_by_css_selector(
-            '.gridPager > td:nth-child(1) > table:nth-child'
-            '(1) > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(12) > a:nth-child(1)')
-        next_page_slot.click()
-        number_of_clicks.append(number_of_clicks)
-        extract_table_multipage(page_data)
-        next_page(number_of_clicks, page_data, this.district_name)
-        district_data = pd.DataFrame(page_data, columns=COLUMNS)
-        district_data.to_csv(os.path.join(Download_Directory, f'{this.district_name}'
-                                                              f'_15_06_to_25_06.csv'))
-        driver.close()
-    except:
-        continue
+    next_to_second_page_slot()
+    driver.close()
+summary_file = open(os.path.join(Download_Directory, 'records_summary_01_06_to_29_06_2020.txt'), 'a')
+summary_file.write(f'Time Period: 01/06/2020 to 29/06/2020'
+                   f'\n FIRs filed in Maharashtra. (Based on published FIRs by Maharashtra Police'
+                   f'\n {no_records} \n\n\nRecords were found in '
+                   f'\n totoal number of districts/unit where record was not found: {len(no_records)}'
+                   f'\n\n\n No records were found in following districts '
+                   f'\n {records_found}'
+                   f'\n total number of districts/unit where record found: {len(records_found)}')
