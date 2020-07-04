@@ -1,7 +1,7 @@
 import logging
 import sys
 
-log_file = '/home/sangharshmanuski/Documents/mha_FIRs/logging_files/logFile_2.log'
+log_file = '/home/sangharshmanuski/Documents/mha_FIRs/logging_files/logFile_4.log'
 
 # logging - source: https://stackoverflow.com/questions/
 # 13733552/logger-configuration-to-log-to-file-and-print-to-stdout

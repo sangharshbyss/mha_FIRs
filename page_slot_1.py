@@ -44,9 +44,11 @@ COLUMNS = ['Sr.No.', 'State', 'District', 'Police Station', 'Year', 'FIR No.', '
 def districts():
     unit_list = Select(driver.find_element_by_css_selector("#ContentPlaceHolder1_ddlDistrict"))
     values = [o.get_attribute("value")
-              for o in unit_list.options if o.get_attribute("value") not in 'Select']
+              for o in unit_list.options if o.get_attribute("value") not in (
+                  'Select', '19372', '19373', '19842', '19374', '19375', '19376', '19377')]
     names = [o.get_attribute("text")
-             for o in unit_list.options if o.get_attribute("value") not in 'Select']
+             for o in unit_list.options if o.get_attribute("value") not in (
+                 'Select', '19372', '19373', '19842', '19374' '19375', '19376', '19377')]
     return values, names
 
 
@@ -232,6 +234,8 @@ wait_for_page_load(driver)
 
 unit_values, unit_names = districts()
 driver.close()
+'''for name, value in zip(unit_names, unit_values):
+    print(f'{name}: {value}')'''
 
 # loop to iterate over each unit
 for unit in unit_values:
@@ -253,21 +257,14 @@ for unit in unit_values:
     # create district object
     this = Search(31052020, 29062020, unit, unit_names[unit_values.index(unit)])
     this.enter_date()
-    wait_for_page_load(driver)
+
     this.search_the_district()
-    wait_for_page_load(driver)
-    if not this.record_found():
-        logger.info(f"no records were found @ {unit_names[unit_values.index(unit)]}")
-        no_records.append(unit_names[unit_values.index(unit)])
-        continue
-    else:
-        logger.info("record available and page is loaded")
-    if not number_of_records():
-        logger.info(f"some issues yet. skip @ {unit_names[unit_values.index(unit)]}")
+    time.sleep(5)
 
+    try:
+        extract_table_current(page_data)
+    except NoSuchElementException:
         continue
-
-    extract_table_current(page_data)
     try:
         next_page(number_of_clicks, page_data, this.district_name)
     except:
