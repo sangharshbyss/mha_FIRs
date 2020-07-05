@@ -13,12 +13,6 @@ import os
 import time
 import pandas as pd
 
-"""from page_slot_15days.py
-Tested twice, works fine if server responds well"""
-
-"""
-reaching to all pages. BUT after end of all pages, it comes back to some of the pages.  """
-
 
 # base function
 
@@ -42,9 +36,7 @@ driver = webdriver.Firefox(options=options)
 get_url(URL)
 time.sleep(10)
 
-Download_Directory = r'/home/sangharshmanuski/Documents/mha_FIRs/raw_footage/raw_footage6'
-# lists and files
-
+Download_Directory = r'/home/sangharshmanuski/Documents/mha_FIRs/raw_footage/raw_footage7'
 
 COLUMNS = ['Sr.No.', 'State', 'District', 'Police Station', 'Year', 'FIR No.', 'Registration Date', 'FIR No',
            'Sections']
@@ -55,11 +47,11 @@ COLUMNS = ['Sr.No.', 'State', 'District', 'Police Station', 'Year', 'FIR No.', '
 def districts():
     unit_list = Select(driver.find_element_by_css_selector("#ContentPlaceHolder1_ddlDistrict"))
     values = [o.get_attribute("value")
-              for o in unit_list.options if o.get_attribute("text") not in (
-                  'Select')]
+              for o in unit_list.options if o.get_attribute("text") in (
+                  'AKOLA')]
     names = [o.get_attribute("text")
-             for o in unit_list.options if o.get_attribute("text") not in (
-                 'Select')]
+             for o in unit_list.options if o.get_attribute("text") in (
+                 'AKOLA')]
     return values, names
 
 
@@ -91,14 +83,14 @@ class Search:
         WebDriverWait(driver, 160).until(
             EC.presence_of_element_located((By.CSS_SELECTOR,
                                             '#ContentPlaceHolder1_txtDateOfRegistrationFrom')))
-        from_datefield = driver.find_element_by_css_selector(
+        from_date_field = driver.find_element_by_css_selector(
             '#ContentPlaceHolder1_txtDateOfRegistrationFrom')
 
-        to_datefield = driver.find_element_by_css_selector(
+        to_date_field = driver.find_element_by_css_selector(
             '#ContentPlaceHolder1_txtDateOfRegistrationTo')
 
-        ActionChains(driver).click(from_datefield).send_keys(
-            self.start_date).move_to_element(to_datefield).click().send_keys(
+        ActionChains(driver).click(from_date_field).send_keys(
+            self.start_date).move_to_element(to_date_field).click().send_keys(
             self.end_date).perform()
 
         logger.info(f'date entered: {self.start_date} to {self.end_date}')
@@ -118,10 +110,12 @@ class Search:
                 except (NoSuchElementException, TimeoutException):
                     time.sleep(1)
                     logger.info("search was not loaded")
-                    broken_records.append(f"{this.district_name} @ search button\n")
+
                     something += 1
+                    continue
             else:
-                break
+
+                logger.info(f"{self.district_name} - broken link")
 
     def number_of_records(self):
         """captures the text indicating number of records.
@@ -130,15 +124,21 @@ class Search:
         time_counter = 1
         while time_counter < 16:
             try:
-                records_number = int(driver.find_element_by_css_selector(
-                    '#ContentPlaceHolder1_lbltotalrecord').text)
+                records_number = driver.find_element_by_css_selector(
+                    '#ContentPlaceHolder1_lbltotalrecord').text
+                if records_number == '':
+                    continue
+                else:
+                    records_number = int(records_number)
                 if records_number != 0:
-                    records_found.append(f"{self.district_name}: {records_number}")
+                    logger.info(f"{self.district_name}: {records_number}")
+
                     return records_number
                 else:
-                    no_records.append(f"no records @ {this.district_name}")
+                    logger.info(f"no records @ {this.district_name}")
+
                     return False
-            except (NoSuchElementException, TimeoutException):
+            except (NoSuchElementException, TimeoutException, StaleElementReferenceException):
                 logger.info("page is not loaded")
                 time_counter += 1
                 continue
@@ -157,18 +157,17 @@ class Search:
                     '#ContentPlaceHolder1_gdvDeadBody_Label2_0')
                 if data_table.text != self.district_name:
                     logger.info(f"no record found @ {self.district_name}")
-                    broken_records.append(f"{this.district_name} @ table did not load\n")
 
                     return False
             else:
                 return True
         except NoSuchElementException:
-            logger.info(f"no record found @ {self.district_name}")
-            broken_records.append(f"{this.district_name} @ table did not load\n")
+            logger.info(f"no record found @ {self.district_name}: Broken")
+
             return False
         except StaleElementReferenceException:
-            logger.info("page not loaded.")
-            broken_records.append(f"{this.district_name} @ table did not load\n")
+            logger.info("page not loaded. Broken")
+
             return False
 
     def extract_table_current(self, single):
@@ -183,7 +182,7 @@ class Search:
             else:
                 logger.info(f"the table did not load @ {self.district_name}."
                             f"stopped trying")
-                broken_records.append(self.district_name)
+
                 return
         rows = main_table.find_all("tr")
         for row in rows:
@@ -205,7 +204,7 @@ class Search:
             else:
                 logger.info(f"the table did not load @ {self.district_name}."
                             f"stopped trying")
-                broken_records.append(self.district_name)
+
                 return
 
         rows = main_table.find_all("tr")
@@ -240,24 +239,19 @@ class Search:
 unit_values, unit_names = districts()
 driver.close()
 # outer loop to iterate over each unit
-a = 25
+a = "29"
 b = "06"
 c = "2020"
-x = 26
+x = "30"
 y = "06"
 z = "2020"
 
-while a >= 1:
-    no_records = []
-    records_found = []
+while int(a) != 0:
+
     page_data = []
     district_data_frame = []
-    broken_records = []
-    day_records = open(os.path.join(Download_Directory, 'list of records.txt'), 'w')
-    broken_records_records_file = open(os.path.join(
-        Download_Directory, 'broken_records.txt'), 'w')
 
-    if a < 10 or x < 10:
+    if int(a) < 10 or int(x) < 10:
         a = str(a)
         a = f"{str(0)}{a}"
         x = str(x)
@@ -270,12 +264,12 @@ while a >= 1:
         options.add_argument("--headless")
         options.add_argument("--private-window")
         driver = webdriver.Firefox(options=options)
+        time.sleep(8)
         driver.get(URL)
         # refresh immediately as the page is of no use without it.
         driver.refresh()
         time.sleep(5)
-        page_data = []
-        district_data_frame = []
+
         view = Select(driver.find_element_by_css_selector(
             '#ContentPlaceHolder1_ucRecordView_ddlPageSize'))
         view.select_by_value('50')
@@ -292,16 +286,23 @@ while a >= 1:
         if second_page_slot():
             this.extract_table_multi_page(page_data)
             this.next_page(page_data)
-        district_data = pd.DataFrame(page_data, columns=COLUMNS)
-        district_data.to_csv(os.path.join(
-            Download_Directory, f'{this.district_name}{a}{b}{c}_to_{x}{y}{z}.csv'))
+
         driver.close()
         time.sleep(8)
-
-    if a < 10 or x < 10:
-        a = a.strip('0')
         a = int(a)
-        a -= 2
-        x = x.strip('0')
         x = int(x)
-        x -= 2
+        if a < 10 or x < 10:
+            a = str(a)
+            a = a.strip("0")
+            a = int(a)
+            a -= 2
+            x = str(x)
+            x = x.strip('0')
+            x = int(x)
+            x -= 2
+        else:
+            a -= 2
+            x -= 2
+
+    district_data = pd.DataFrame(page_data, columns=COLUMNS)
+    district_data.to_csv(os.path.join(Download_Directory, f'AKOLA{b}{c}.csv'))
